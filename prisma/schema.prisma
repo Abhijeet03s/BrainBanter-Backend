@@ -1,0 +1,127 @@
+// This is your Prisma schema file
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+   provider = "prisma-client-js"
+}
+
+datasource db {
+   provider = "postgresql"
+   url      = env("DATABASE_URL")
+}
+
+model User {
+   id           String   @id @default(uuid())
+   username     String   @unique
+   email        String   @unique
+   passwordHash String
+   preferences  Json?
+   role         String   @default("user") // 'user', 'admin', 'moderator'
+   authProvider String? // 'email', 'google', 'github' etc.
+   createdAt    DateTime @default(now()) @map("created_at")
+   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+   debates     DebateSession[]
+   feedback    Feedback[]
+   Report      Report[]
+   SavedDebate SavedDebate[]
+
+   @@map("Users")
+}
+
+model DebateSession {
+   id        String   @id @default(uuid())
+   userId    String   @map("user_id")
+   user      User     @relation(fields: [userId], references: [id])
+   title     String?
+   category  String? // e.g., 'Technology', 'Ethics', 'Politics'
+   mode      String // 'creative', 'business', 'philosophical'
+   status    String   @default("active") // 'active', 'completed', 'archived'
+   createdAt DateTime @default(now()) @map("created_at")
+   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+   messages     Message[]
+   mindMapNodes MindMapNode[]
+   feedback     Feedback[]
+   analytics    ConversationAnalytics?
+   SavedDebate  SavedDebate[]
+
+   @@map("DebateSessions")
+}
+
+model SavedDebate {
+   id              String        @id @default(uuid())
+   userId          String        @map("user_id")
+   user            User          @relation(fields: [userId], references: [id])
+   debateSessionId String        @map("debate_session_id")
+   debateSession   DebateSession @relation(fields: [debateSessionId], references: [id])
+   createdAt       DateTime      @default(now()) @map("created_at")
+
+   @@map("SavedDebates")
+}
+
+model Message {
+   id              String        @id @default(uuid())
+   debateSessionId String        @map("debate_session_id")
+   debateSession   DebateSession @relation(fields: [debateSessionId], references: [id])
+   sender          String // 'user' or 'ai'
+   content         String
+   createdAt       DateTime      @default(now()) @map("created_at")
+   feedback        Feedback[]
+   Report          Report[]
+
+   @@map("Messages")
+}
+
+model MindMapNode {
+   id              String        @id @default(uuid())
+   debateSessionId String        @map("debate_session_id")
+   debateSession   DebateSession @relation(fields: [debateSessionId], references: [id])
+   parentNodeId    String?       @map("parent_node_id")
+   parentNode      MindMapNode?  @relation("NodeHierarchy", fields: [parentNodeId], references: [id])
+   childNodes      MindMapNode[] @relation("NodeHierarchy")
+   content         String
+   nodeType        String        @map("node_type") // 'idea' or 'counterargument'
+   positionX       Float?        @map("position_x")
+   positionY       Float?        @map("position_y")
+   createdAt       DateTime      @default(now()) @map("created_at")
+
+   @@map("MindMapNodes")
+}
+
+model Feedback {
+   id              String        @id @default(uuid())
+   userId          String        @map("user_id")
+   user            User          @relation(fields: [userId], references: [id])
+   debateSessionId String        @map("debate_session_id")
+   debateSession   DebateSession @relation(fields: [debateSessionId], references: [id])
+   messageId       String        @map("message_id")
+   message         Message       @relation(fields: [messageId], references: [id])
+   rating          Int
+   comment         String?
+   createdAt       DateTime      @default(now()) @map("created_at")
+
+   @@map("Feedback")
+}
+
+model ConversationAnalytics {
+   id              String        @id @default(uuid())
+   debateSessionId String        @unique @map("debate_session_id")
+   debateSession   DebateSession @relation(fields: [debateSessionId], references: [id])
+   totalMessages   Int           @map("total_messages")
+   duration        Int // duration in seconds
+   createdAt       DateTime      @default(now()) @map("created_at")
+
+   @@map("ConversationAnalytics")
+}
+
+model Report {
+   id         String   @id @default(uuid())
+   reportedBy String   @map("reported_by") // User ID of the person who reported
+   user       User     @relation(fields: [reportedBy], references: [id])
+   messageId  String   @map("message_id")
+   message    Message  @relation(fields: [messageId], references: [id])
+   reason     String // e.g., 'offensive', 'incorrect', 'spam'
+   status     String   @default("pending") // 'pending', 'reviewed', 'resolved'
+   createdAt  DateTime @default(now()) @map("created_at")
+}
