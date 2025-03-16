@@ -42,7 +42,7 @@ export const authenticateUser = async (
          return;
       }
 
-      // Add user to request object
+      // Extract user data correctly
       req.user = data.user;
       next();
    } catch (error) {

@@ -8,9 +8,10 @@ const prisma = new PrismaClient();
  */
 export const handleUserAuth = async (req: Request, res: Response) => {
    try {
-      const { user } = req;
+      // Extract the user data correctly from the nested structure
+      const userData = req.user?.user || req.user;
 
-      if (!user || !user.id || !user.email) {
+      if (!userData || !userData.id || !userData.email) {
          res.status(400).json({
             error: 'Bad Request',
             message: 'Invalid user data'
@@ -20,17 +21,16 @@ export const handleUserAuth = async (req: Request, res: Response) => {
 
       // Check if user already exists in our database
       let dbUser = await prisma.user.findUnique({
-         where: { email: user.email }
+         where: { email: userData.email }
       });
 
       if (!dbUser) {
          // Create new user in our database
          dbUser = await prisma.user.create({
             data: {
-               id: user.id,
-               email: user.email,
-               username: user.email.split('@')[0], // Default username from email
-               passwordHash: '', // We don't store the actual password
+               id: userData.id,
+               email: userData.email,
+               username: userData.username || userData.email.split('@')[0], // Use existing username or create from email
                authProvider: 'supabase'
             }
          });
@@ -38,11 +38,9 @@ export const handleUserAuth = async (req: Request, res: Response) => {
 
       res.status(200).json({
          message: 'User authenticated successfully',
-         user: {
-            id: dbUser.id,
-            email: dbUser.email,
-            username: dbUser.username
-         }
+         id: dbUser.id,
+         email: dbUser.email,
+         username: dbUser.username
       });
    } catch (error) {
       console.error('Error in handleUserAuth:', error);
@@ -58,9 +56,9 @@ export const handleUserAuth = async (req: Request, res: Response) => {
  */
 export const getCurrentUser = async (req: Request, res: Response) => {
    try {
-      const { user } = req;
+      const userData = req.user?.user || req.user;
 
-      if (!user || !user.id) {
+      if (!userData || !userData.id) {
          res.status(401).json({
             error: 'Unauthorized',
             message: 'User not authenticated'
@@ -70,7 +68,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
 
       // Get user from our database
       const dbUser = await prisma.user.findUnique({
-         where: { id: user.id }
+         where: { id: userData.id }
       });
 
       if (!dbUser) {
@@ -82,12 +80,10 @@ export const getCurrentUser = async (req: Request, res: Response) => {
       }
 
       res.status(200).json({
-         user: {
-            id: dbUser.id,
-            email: dbUser.email,
-            username: dbUser.username,
-            preferences: dbUser.preferences
-         }
+         id: dbUser.id,
+         email: dbUser.email,
+         username: dbUser.username,
+         preferences: dbUser.preferences
       });
    } catch (error) {
       console.error('Error in getCurrentUser:', error);
