@@ -30,7 +30,7 @@ export const handleUserAuth = async (req: Request, res: Response) => {
             data: {
                id: userData.id,
                email: userData.email,
-               username: userData.username || userData.email.split('@')[0], // Use existing username or create from email
+               username: userData.username || userData.email.split('@')[0],
                authProvider: 'supabase'
             }
          });

@@ -10,9 +10,6 @@ declare global {
    }
 }
 
-/**
- * Middleware to authenticate requests using Supabase JWT
- */
 export const authenticateUser = async (
    req: Request,
    res: Response,
@@ -53,32 +50,3 @@ export const authenticateUser = async (
       });
    }
 };
-
-/**
- * Optional authentication middleware - doesn't reject if no token
- */
-export const optionalAuth = async (
-   req: Request,
-   res: Response,
-   next: NextFunction
-) => {
-   const authHeader = req.headers.authorization;
-
-   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return next();
-   }
-
-   const token = authHeader.split(' ')[1];
-
-   try {
-      const { data } = await supabaseAdmin.auth.getUser(token);
-      if (data?.user) {
-         req.user = data.user;
-      }
-   } catch (error) {
-      // Just continue if token is invalid
-      console.warn('Invalid token in optional auth');
-   }
-
-   next();
-}; 

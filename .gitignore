@@ -5,6 +5,7 @@ build
 .vscode
 .idea
 .cursorrules
+.cursor/rules
 plan.md
 
 # Logs

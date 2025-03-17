@@ -10,4 +10,4 @@ router.post('/callback', authenticateUser, handleUserAuth);
 // Route to get current user profile
 router.get('/me', authenticateUser, getCurrentUser);
 
-export default router; 
+export default router;
