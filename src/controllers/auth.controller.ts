@@ -1,11 +1,9 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { supabaseAdmin } from '../config/supabase';
 
 const prisma = new PrismaClient();
 
-/**
- * Create or update user in our database after Supabase authentication
- */
 export const handleUserAuth = async (req: Request, res: Response) => {
    try {
       // Extract the user data correctly from the nested structure
@@ -51,9 +49,6 @@ export const handleUserAuth = async (req: Request, res: Response) => {
    }
 };
 
-/**
- * Get current user profile
- */
 export const getCurrentUser = async (req: Request, res: Response) => {
    try {
       const userData = req.user?.user || req.user;
@@ -92,4 +87,55 @@ export const getCurrentUser = async (req: Request, res: Response) => {
          message: 'Failed to retrieve user profile'
       });
    }
-}; 
+};
+
+export const forgotPassword = async (req: Request, res: Response) => {
+   try {
+      const { email } = req.body;
+
+      if (!email) {
+         res.status(400).json({
+            error: 'Bad Request',
+            message: 'Email is required'
+         });
+         return;
+      }
+
+      // Check if user exists in our database
+      const user = await prisma.user.findUnique({
+         where: { email }
+      });
+
+      if (!user) {
+         // Still return success to prevent email enumeration attacks
+         res.status(200).json({
+            message: 'If an account with that email exists, a password reset link has been sent'
+         });
+         return;
+      }
+
+      // Send password reset email via Supabase Auth
+      const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+         redirectTo: process.env.PASSWORD_RESET_REDIRECT_URL || 'https://yourapp.com/reset-password',
+      });
+
+      if (error) {
+         console.error('Error sending reset email:', error);
+         res.status(500).json({
+            error: 'Internal Server Error',
+            message: 'Failed to send password reset email'
+         });
+         return;
+      }
+
+      res.status(200).json({
+         message: 'If an account with that email exists, a password reset link has been sent'
+      });
+   } catch (error) {
+      console.error('Error in forgotPassword:', error);
+      res.status(500).json({
+         error: 'Internal Server Error',
+         message: 'Failed to process password reset request'
+      });
+   }
+};
