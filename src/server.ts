@@ -3,8 +3,8 @@ import bodyParser from 'body-parser';
 import cors from 'cors';
 import authRoutes from './routes/auth.routes';
 import dotenv from 'dotenv';
+import debateRoutes from './routes/debate.routes';
 
-// Load environment variables
 dotenv.config();
 
 const app: Application = express();
@@ -17,6 +17,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/debates', debateRoutes);
 
 // Health check route
 app.get('/health', (req, res) => {
