@@ -3,7 +3,8 @@ import {
    startDebateSession,
    sendMessage,
    getDebateSession,
-   getUserDebateSessions
+   getUserDebateSessions,
+   deleteDebateSession
 } from '../controllers/debate.controller';
 import { authenticateUser } from '../middleware/auth';
 import { aiService } from '../services/ai.service';
@@ -40,5 +41,8 @@ router.get('/sessions/:sessionId', getDebateSession);
 
 // Route to get all user's debate sessions
 router.get('/sessions', getUserDebateSessions);
+
+// Route to delete a debate session
+router.delete('/sessions/:sessionId', deleteDebateSession);
 
 export default router; 

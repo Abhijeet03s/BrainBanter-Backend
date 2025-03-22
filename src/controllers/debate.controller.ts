@@ -227,4 +227,79 @@ export const getUserDebateSessions = async (req: Request, res: Response) => {
          message: 'Failed to retrieve user debate sessions'
       });
    }
+};
+
+export const deleteDebateSession = async (req: Request, res: Response) => {
+   try {
+      const userData = req.user?.user || req.user;
+      const { sessionId } = req.params;
+
+      if (!userData || !userData.id) {
+         return res.status(401).json({
+            error: 'Unauthorized',
+            message: 'User not authenticated'
+         });
+      }
+
+      // Check if the debate session exists and belongs to the user
+      const debateSession = await prisma.debateSession.findFirst({
+         where: {
+            id: sessionId,
+            userId: userData.id
+         }
+      });
+
+      if (!debateSession) {
+         return res.status(404).json({
+            error: 'Not Found',
+            message: 'Debate session not found or does not belong to the user'
+         });
+      }
+
+      // Delete all related messages first (due to foreign key constraints)
+      await prisma.message.deleteMany({
+         where: {
+            debateSessionId: sessionId
+         }
+      });
+
+      // Delete any related mind map nodes
+      await prisma.mindMapNode.deleteMany({
+         where: {
+            debateSessionId: sessionId
+         }
+      });
+
+      // Delete any related feedback
+      await prisma.feedback.deleteMany({
+         where: {
+            debateSessionId: sessionId
+         }
+      });
+
+      // Delete the analytics
+      await prisma.conversationAnalytics.deleteMany({
+         where: {
+            debateSessionId: sessionId
+         }
+      });
+
+      // Finally, delete the debate session
+      await prisma.debateSession.delete({
+         where: {
+            id: sessionId
+         }
+      });
+
+      res.status(200).json({
+         success: true,
+         message: 'Debate session deleted successfully'
+      });
+   } catch (error) {
+      console.error('Error deleting debate session:', error);
+      res.status(500).json({
+         error: 'Internal Server Error',
+         message: 'Failed to delete debate session'
+      });
+   }
 }; 
