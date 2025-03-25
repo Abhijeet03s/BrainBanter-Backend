@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { handleUserAuth, getCurrentUser, forgotPassword } from '../controllers/auth.controller';
+import { handleUserAuth, getCurrentUser, forgotPassword, logout } from '../controllers/auth.controller';
 import { authenticateUser } from '../middleware/auth';
 
 const router = Router();
@@ -12,5 +12,8 @@ router.get('/me', authenticateUser, getCurrentUser);
 
 // Route for forgot password
 router.post('/forgot-password', forgotPassword);
+
+// Route for logout
+router.post('/logout', authenticateUser, logout);
 
 export default router;

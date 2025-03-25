@@ -139,3 +139,50 @@ export const forgotPassword = async (req: Request, res: Response) => {
       });
    }
 };
+
+export const logout = async (req: Request, res: Response) => {
+   try {
+      const authHeader = req.headers.authorization;
+
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+         res.status(400).json({
+            error: 'Bad Request',
+            message: 'Missing or invalid authorization header'
+         });
+         return;
+      }
+
+      const token = authHeader.split(' ')[1];
+
+      // Set auth context with the user's JWT token
+      supabaseAdmin.auth.setSession({
+         access_token: token,
+         refresh_token: ''
+      });
+
+      // Sign out using Supabase - invalidate the user's session
+      const { error } = await supabaseAdmin.auth.signOut({
+         scope: 'global'
+      });
+
+      if (error) {
+         console.error('Error logging out user:', error);
+         res.status(500).json({
+            error: 'Internal Server Error',
+            message: 'Failed to logout user'
+         });
+         return;
+      }
+
+      res.status(200).json({
+         success: true,
+         message: 'User logged out successfully'
+      });
+   } catch (error) {
+      console.error('Error in logout:', error);
+      res.status(500).json({
+         error: 'Internal Server Error',
+         message: 'Failed to process logout request'
+      });
+   }
+};
