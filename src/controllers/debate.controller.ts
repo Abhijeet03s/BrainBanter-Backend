@@ -263,13 +263,6 @@ export const deleteDebateSession = async (req: Request, res: Response) => {
          }
       });
 
-      // Delete any related mind map nodes
-      await prisma.mindMapNode.deleteMany({
-         where: {
-            debateSessionId: sessionId
-         }
-      });
-
       // Delete any related feedback
       await prisma.feedback.deleteMany({
          where: {

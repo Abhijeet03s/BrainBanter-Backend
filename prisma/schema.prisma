@@ -39,11 +39,10 @@ model DebateSession {
    createdAt DateTime @default(now()) @map("created_at")
    updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-   messages     Message[]
-   mindMapNodes MindMapNode[]
-   feedback     Feedback[]
-   analytics    ConversationAnalytics?
-   SavedDebate  SavedDebate[]
+   messages    Message[]
+   feedback    Feedback[]
+   analytics   ConversationAnalytics?
+   SavedDebate SavedDebate[]
 
    @@map("DebateSessions")
 }
@@ -63,29 +62,13 @@ model Message {
    id              String        @id @default(uuid())
    debateSessionId String        @map("debate_session_id")
    debateSession   DebateSession @relation(fields: [debateSessionId], references: [id])
-   sender          String // 'user' or 'ai'
+   sender          String
    content         String
    createdAt       DateTime      @default(now()) @map("created_at")
    feedback        Feedback[]
    Report          Report[]
 
    @@map("Messages")
-}
-
-model MindMapNode {
-   id              String        @id @default(uuid())
-   debateSessionId String        @map("debate_session_id")
-   debateSession   DebateSession @relation(fields: [debateSessionId], references: [id])
-   parentNodeId    String?       @map("parent_node_id")
-   parentNode      MindMapNode?  @relation("NodeHierarchy", fields: [parentNodeId], references: [id])
-   childNodes      MindMapNode[] @relation("NodeHierarchy")
-   content         String
-   nodeType        String        @map("node_type") // 'idea' or 'counterargument'
-   positionX       Float?        @map("position_x")
-   positionY       Float?        @map("position_y")
-   createdAt       DateTime      @default(now()) @map("created_at")
-
-   @@map("MindMapNodes")
 }
 
 model Feedback {
