@@ -1,8 +1,19 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { aiService } from '../services/ai.service';
+import { getInitialDebatePrompt } from '../config/prompts';
 
 const prisma = new PrismaClient();
+
+const ensureCleanFormatting = (text: string): string => {
+   // Remove all markdown formatting
+   return text
+      .replace(/\*{1,3}([^*]+?)\*{1,3}/g, '$1') // Remove all asterisks formatting
+      .replace(/^([A-Za-z\s]+):\s*$/gm, '$1')   // Remove section headers 
+      .replace(/^\s*[\d*-]+\.?\s+/gm, '')       // Remove list markers
+      .replace(/\n{3,}/g, '\n\n')               // Clean up extra newlines
+      .trim();
+};
 
 export const startDebateSession = async (req: Request, res: Response) => {
    try {
@@ -33,9 +44,15 @@ export const startDebateSession = async (req: Request, res: Response) => {
          }
       });
 
-      // Generate initial AI response to the topic
-      const initialPrompt = `I want to discuss the topic: "${topic}". Please provide an initial perspective and ask thought-provoking follow-up questions to start our debate.`;
-      const aiResponse = await aiService.generateDebateResponse(initialPrompt);
+      // Get the initial debate prompt
+      const initialPrompt = getInitialDebatePrompt(topic);
+
+      // Generate initial AI response with counterarguments
+      // No history for the first message
+      const aiResponse = await aiService.generateDebateResponse(initialPrompt, [], {
+         stance: 'challenging',
+         depth: 'deep'
+      });
 
       // Save the user's initial message
       const userMessage = await prisma.message.create({
@@ -51,7 +68,7 @@ export const startDebateSession = async (req: Request, res: Response) => {
          data: {
             debateSessionId: debateSession.id,
             sender: 'ai',
-            content: aiResponse
+            content: ensureCleanFormatting(aiResponse)
          }
       });
 
@@ -123,15 +140,22 @@ export const sendMessage = async (req: Request, res: Response) => {
          }
       });
 
-      // Generate AI response based on conversation history
-      const aiResponse = await aiService.generateDebateResponse(message, history);
+      // Analyze sentiment and determine appropriate stance
+      const analysisResult = await aiService.analyzeUserSentiment(message, history);
+
+      // Generate AI response based on conversation history and analysis
+      const aiResponse = await aiService.generateDebateResponse(
+         message,
+         history,
+         analysisResult
+      );
 
       // Save the AI's response
       const aiMessage = await prisma.message.create({
          data: {
             debateSessionId: sessionId,
             sender: 'ai',
-            content: aiResponse
+            content: ensureCleanFormatting(aiResponse)
          }
       });
 
