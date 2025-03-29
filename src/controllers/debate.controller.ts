@@ -319,4 +319,158 @@ export const deleteDebateSession = async (req: Request, res: Response) => {
          message: 'Failed to delete debate session'
       });
    }
+};
+
+export const saveDebateSession = async (req: Request, res: Response) => {
+   try {
+      const userData = req.user?.user || req.user;
+      const { sessionId } = req.params;
+
+      if (!userData || !userData.id) {
+         return res.status(401).json({
+            error: 'Unauthorized',
+            message: 'User not authenticated'
+         });
+      }
+
+      // Check if the debate session exists
+      const debateSession = await prisma.debateSession.findUnique({
+         where: {
+            id: sessionId
+         }
+      });
+
+      if (!debateSession) {
+         return res.status(404).json({
+            error: 'Not Found',
+            message: 'Debate session not found'
+         });
+      }
+
+      // Check if this debate is already saved by the user
+      const existingSave = await prisma.savedDebate.findFirst({
+         where: {
+            userId: userData.id,
+            debateSessionId: sessionId
+         }
+      });
+
+      if (existingSave) {
+         return res.status(400).json({
+            error: 'Bad Request',
+            message: 'Debate session is already saved'
+         });
+      }
+
+      // Save the debate session
+      const savedDebate = await prisma.savedDebate.create({
+         data: {
+            userId: userData.id,
+            debateSessionId: sessionId
+         }
+      });
+
+      res.status(201).json({
+         success: true,
+         savedDebate
+      });
+   } catch (error) {
+      console.error('Error saving debate session:', error);
+      res.status(500).json({
+         error: 'Internal Server Error',
+         message: 'Failed to save debate session'
+      });
+   }
+};
+
+export const getSavedDebates = async (req: Request, res: Response) => {
+   try {
+      const userData = req.user?.user || req.user;
+
+      if (!userData || !userData.id) {
+         return res.status(401).json({
+            error: 'Unauthorized',
+            message: 'User not authenticated'
+         });
+      }
+
+      // Get all saved debates for the user with related debate session data
+      const savedDebates = await prisma.savedDebate.findMany({
+         where: {
+            userId: userData.id
+         },
+         include: {
+            debateSession: {
+               select: {
+                  id: true,
+                  title: true,
+                  mode: true,
+                  status: true,
+                  createdAt: true
+               }
+            }
+         },
+         orderBy: {
+            createdAt: 'desc'
+         }
+      });
+
+      res.status(200).json({
+         success: true,
+         savedDebates
+      });
+   } catch (error) {
+      console.error('Error retrieving saved debates:', error);
+      res.status(500).json({
+         error: 'Internal Server Error',
+         message: 'Failed to retrieve saved debates'
+      });
+   }
+};
+
+export const removeSavedDebate = async (req: Request, res: Response) => {
+   try {
+      const userData = req.user?.user || req.user;
+      const { savedId } = req.params;
+
+      if (!userData || !userData.id) {
+         return res.status(401).json({
+            error: 'Unauthorized',
+            message: 'User not authenticated'
+         });
+      }
+
+      // Check if the saved debate exists and belongs to the user
+      const savedDebate = await prisma.savedDebate.findFirst({
+         where: {
+            id: savedId,
+            userId: userData.id
+         }
+      });
+
+      if (!savedDebate) {
+         return res.status(404).json({
+            error: 'Not Found',
+            message: 'Saved debate not found or does not belong to the user'
+         });
+      }
+
+      // Delete the saved debate
+      await prisma.savedDebate.delete({
+         where: {
+            id: savedId
+         }
+      });
+
+      res.status(200).json({
+         success: true,
+         message: 'Saved debate removed successfully'
+      });
+   } catch (error) {
+      console.error('Error removing saved debate:', error);
+      res.status(500).json({
+         error: 'Internal Server Error',
+         message: 'Failed to remove saved debate'
+      });
+   }
 }; 

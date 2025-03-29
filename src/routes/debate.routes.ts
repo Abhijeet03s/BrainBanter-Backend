@@ -4,28 +4,14 @@ import {
    sendMessage,
    getDebateSession,
    getUserDebateSessions,
-   deleteDebateSession
+   deleteDebateSession,
+   saveDebateSession,
+   getSavedDebates,
+   removeSavedDebate
 } from '../controllers/debate.controller';
 import { authenticateUser } from '../middleware/auth';
-import { aiService } from '../services/ai.service';
 
 const router = Router();
-
-// Test route for AI - remove in production
-router.post('/test-ai', async (req, res) => {
-   try {
-      const { prompt } = req.body;
-      if (!prompt) {
-         return res.status(400).json({ error: 'Prompt is required' });
-      }
-
-      const response = await aiService.generateDebateResponse(prompt);
-      res.json({ response });
-   } catch (error) {
-      console.error('AI test error:', error);
-      res.status(500).json({ error: 'Failed to generate AI response' });
-   }
-});
 
 // All routes below require authentication
 router.use(authenticateUser);
@@ -44,5 +30,14 @@ router.get('/sessions', getUserDebateSessions);
 
 // Route to delete a debate session
 router.delete('/sessions/:sessionId', deleteDebateSession);
+
+// Route to save a debate session
+router.post('/sessions/:sessionId/save', saveDebateSession);
+
+// Route to get all saved debates for a user
+router.get('/saved', getSavedDebates);
+
+// Route to remove a saved debate
+router.delete('/saved/:savedId', removeSavedDebate);
 
 export default router; 
