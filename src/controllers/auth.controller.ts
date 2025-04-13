@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { supabaseAdmin } from '../config/supabase';
+import { logger } from '../utils/logger';
+import { sendSuccessResponse, sendErrorResponse, ApiError, getRequestId } from '../utils/api-utils';
 
 const prisma = new PrismaClient();
 
@@ -143,13 +145,10 @@ export const forgotPassword = async (req: Request, res: Response) => {
 export const logout = async (req: Request, res: Response) => {
    try {
       const authHeader = req.headers.authorization;
+      const requestId = getRequestId(req);
 
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
-         res.status(400).json({
-            error: 'Bad Request',
-            message: 'Missing or invalid authorization header'
-         });
-         return;
+         throw new ApiError('Missing or invalid authorization header', 400);
       }
 
       const token = authHeader.split(' ')[1];
@@ -166,23 +165,28 @@ export const logout = async (req: Request, res: Response) => {
       });
 
       if (error) {
-         console.error('Error logging out user:', error);
-         res.status(500).json({
-            error: 'Internal Server Error',
-            message: 'Failed to logout user'
+         logger.error('Error logging out user', {
+            error,
+            requestId,
+            userId: req.user?.id
          });
-         return;
+         throw new ApiError('Failed to logout user', 500);
       }
 
-      res.status(200).json({
-         success: true,
-         message: 'User logged out successfully'
+      logger.info('User logged out successfully', {
+         userId: req.user?.id,
+         requestId
       });
+
+      return sendSuccessResponse(res, 200, null, 'User logged out successfully');
    } catch (error) {
-      console.error('Error in logout:', error);
-      res.status(500).json({
-         error: 'Internal Server Error',
-         message: 'Failed to process logout request'
+      const statusCode = error instanceof ApiError ? error.statusCode : 500;
+
+      return sendErrorResponse(res, error as Error, statusCode, {
+         requestId: getRequestId(req),
+         path: req.path,
+         method: req.method,
+         userId: req.user?.id
       });
    }
 };
