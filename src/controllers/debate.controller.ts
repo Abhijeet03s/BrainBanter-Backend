@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { aiService } from '../services/ai.service';
 import { getInitialDebatePrompt } from '../config/prompts';
+import { logger } from '../utils/logger';
+import { sendSuccessResponse, sendErrorResponse, ApiError, getRequestId } from '../utils/api-utils';
 
 const prisma = new PrismaClient();
 
@@ -17,24 +19,36 @@ const ensureCleanFormatting = (text: string): string => {
 
 export const startDebateSession = async (req: Request, res: Response) => {
    try {
+      const requestId = getRequestId(req);
       const userData = req.user?.user || req.user;
       const { topic, mode = 'creative' } = req.body;
 
       if (!userData || !userData.id) {
-         return res.status(401).json({
-            error: 'Unauthorized',
-            message: 'User not authenticated'
+         logger.warn('Unauthorized attempt to start debate session', {
+            requestId,
+            path: req.path,
+            method: req.method
          });
+         throw new ApiError('User not authenticated', 401);
       }
 
       if (!topic) {
-         return res.status(400).json({
-            error: 'Bad Request',
-            message: 'Topic is required to start a debate'
+         logger.warn('Missing topic in debate session request', {
+            requestId,
+            userId: userData.id,
+            path: req.path
          });
+         throw new ApiError('Topic is required to start a debate', 400);
       }
 
       // Create a new debate session
+      logger.info('Creating new debate session', {
+         requestId,
+         userId: userData.id,
+         topic,
+         mode
+      });
+
       const debateSession = await prisma.debateSession.create({
          data: {
             userId: userData.id,
@@ -49,6 +63,12 @@ export const startDebateSession = async (req: Request, res: Response) => {
 
       // Generate initial AI response with counterarguments
       // No history for the first message
+      logger.debug('Generating initial AI response', {
+         requestId,
+         debateSessionId: debateSession.id,
+         topic
+      });
+
       const aiResponse = await aiService.generateDebateResponse(initialPrompt, [], {
          stance: 'challenging',
          depth: 'deep'
@@ -72,38 +92,62 @@ export const startDebateSession = async (req: Request, res: Response) => {
          }
       });
 
-      res.status(201).json({
-         success: true,
+      logger.info('Debate session started successfully', {
+         requestId,
+         userId: userData.id,
+         debateSessionId: debateSession.id,
+         messageCount: 2 // Initial user message + AI response
+      });
+
+      return sendSuccessResponse(res, 201, {
          session: debateSession,
          messages: [userMessage, aiMessage]
       });
    } catch (error) {
-      console.error('Error starting debate session:', error);
-      res.status(500).json({
-         error: 'Internal Server Error',
-         message: 'Failed to start debate session'
+      const statusCode = error instanceof ApiError ? error.statusCode : 500;
+
+      logger.error('Error starting debate session', {
+         error,
+         requestId: getRequestId(req),
+         path: req.path,
+         method: req.method,
+         userId: req.user?.id
+      });
+
+      return sendErrorResponse(res, error as Error, statusCode, {
+         requestId: getRequestId(req),
+         path: req.path,
+         method: req.method,
+         userId: req.user?.id
       });
    }
 };
 
 export const sendMessage = async (req: Request, res: Response) => {
    try {
+      const requestId = getRequestId(req);
       const userData = req.user?.user || req.user;
       const { sessionId } = req.params;
       const { message } = req.body;
 
       if (!userData || !userData.id) {
-         return res.status(401).json({
-            error: 'Unauthorized',
-            message: 'User not authenticated'
+         logger.warn('Unauthorized attempt to send message', {
+            requestId,
+            sessionId,
+            path: req.path,
+            method: req.method
          });
+         throw new ApiError('User not authenticated', 401);
       }
 
       if (!sessionId || !message) {
-         return res.status(400).json({
-            error: 'Bad Request',
-            message: 'Session ID and message are required'
+         logger.warn('Missing session ID or message in request', {
+            requestId,
+            userId: userData.id,
+            sessionId,
+            path: req.path
          });
+         throw new ApiError('Session ID and message are required', 400);
       }
 
       // Check if the debate session exists and belongs to the user
@@ -115,11 +159,20 @@ export const sendMessage = async (req: Request, res: Response) => {
       });
 
       if (!debateSession) {
-         return res.status(404).json({
-            error: 'Not Found',
-            message: 'Debate session not found or does not belong to the user'
+         logger.warn('Debate session not found or unauthorized access', {
+            requestId,
+            userId: userData.id,
+            sessionId,
+            path: req.path
          });
+         throw new ApiError('Debate session not found or does not belong to the user', 404);
       }
+
+      logger.debug('Processing message for debate session', {
+         requestId,
+         userId: userData.id,
+         sessionId
+      });
 
       // Get the conversation history
       const history = await prisma.message.findMany({
@@ -143,6 +196,13 @@ export const sendMessage = async (req: Request, res: Response) => {
       // Analyze sentiment and determine appropriate stance
       const analysisResult = await aiService.analyzeUserSentiment(message, history);
 
+      logger.debug('AI sentiment analysis completed', {
+         requestId,
+         sessionId,
+         stance: analysisResult.stance,
+         depth: analysisResult.depth
+      });
+
       // Generate AI response based on conversation history and analysis
       const aiResponse = await aiService.generateDebateResponse(
          message,
@@ -159,30 +219,59 @@ export const sendMessage = async (req: Request, res: Response) => {
          }
       });
 
-      res.status(200).json({
-         success: true,
+      logger.info('Message processed successfully', {
+         requestId,
+         userId: userData.id,
+         sessionId,
+         messageId: aiMessage.id
+      });
+
+      return sendSuccessResponse(res, 200, {
          messages: [userMessage, aiMessage]
       });
    } catch (error) {
-      console.error('Error sending message:', error);
-      res.status(500).json({
-         error: 'Internal Server Error',
-         message: 'Failed to process message'
+      const statusCode = error instanceof ApiError ? error.statusCode : 500;
+
+      logger.error('Error sending message', {
+         error,
+         requestId: getRequestId(req),
+         path: req.path,
+         method: req.method,
+         userId: req.user?.id,
+         sessionId: req.params.sessionId
+      });
+
+      return sendErrorResponse(res, error as Error, statusCode, {
+         requestId: getRequestId(req),
+         path: req.path,
+         method: req.method,
+         userId: req.user?.id,
+         sessionId: req.params.sessionId
       });
    }
 };
 
 export const getDebateSession = async (req: Request, res: Response) => {
    try {
+      const requestId = getRequestId(req);
       const userData = req.user?.user || req.user;
       const { sessionId } = req.params;
 
       if (!userData || !userData.id) {
-         return res.status(401).json({
-            error: 'Unauthorized',
-            message: 'User not authenticated'
+         logger.warn('Unauthorized attempt to access debate session', {
+            requestId,
+            sessionId,
+            path: req.path,
+            method: req.method
          });
+         throw new ApiError('User not authenticated', 401);
       }
+
+      logger.debug('Retrieving debate session', {
+         requestId,
+         userId: userData.id,
+         sessionId
+      });
 
       // Get the debate session
       const debateSession = await prisma.debateSession.findFirst({
@@ -200,35 +289,65 @@ export const getDebateSession = async (req: Request, res: Response) => {
       });
 
       if (!debateSession) {
-         return res.status(404).json({
-            error: 'Not Found',
-            message: 'Debate session not found or does not belong to the user'
+         logger.warn('Debate session not found or unauthorized access', {
+            requestId,
+            userId: userData.id,
+            sessionId,
+            path: req.path
          });
+         throw new ApiError('Debate session not found or does not belong to the user', 404);
       }
 
-      res.status(200).json({
-         success: true,
+      logger.debug('Debate session retrieved successfully', {
+         requestId,
+         userId: userData.id,
+         sessionId,
+         messageCount: debateSession.messages.length
+      });
+
+      return sendSuccessResponse(res, 200, {
          session: debateSession
       });
    } catch (error) {
-      console.error('Error retrieving debate session:', error);
-      res.status(500).json({
-         error: 'Internal Server Error',
-         message: 'Failed to retrieve debate session'
+      const statusCode = error instanceof ApiError ? error.statusCode : 500;
+
+      logger.error('Error retrieving debate session', {
+         error,
+         requestId: getRequestId(req),
+         path: req.path,
+         method: req.method,
+         userId: req.user?.id,
+         sessionId: req.params.sessionId
+      });
+
+      return sendErrorResponse(res, error as Error, statusCode, {
+         requestId: getRequestId(req),
+         path: req.path,
+         method: req.method,
+         userId: req.user?.id,
+         sessionId: req.params.sessionId
       });
    }
 };
 
 export const getUserDebateSessions = async (req: Request, res: Response) => {
    try {
+      const requestId = getRequestId(req);
       const userData = req.user?.user || req.user;
 
       if (!userData || !userData.id) {
-         return res.status(401).json({
-            error: 'Unauthorized',
-            message: 'User not authenticated'
+         logger.warn('Unauthorized attempt to access user debate sessions', {
+            requestId,
+            path: req.path,
+            method: req.method
          });
+         throw new ApiError('User not authenticated', 401);
       }
+
+      logger.debug('Retrieving user debate sessions', {
+         requestId,
+         userId: userData.id
+      });
 
       // Get all debate sessions for the user
       const debateSessions = await prisma.debateSession.findMany({
@@ -240,30 +359,56 @@ export const getUserDebateSessions = async (req: Request, res: Response) => {
          }
       });
 
-      res.status(200).json({
-         success: true,
+      logger.debug('User debate sessions retrieved successfully', {
+         requestId,
+         userId: userData.id,
+         sessionCount: debateSessions.length
+      });
+
+      return sendSuccessResponse(res, 200, {
          sessions: debateSessions
       });
    } catch (error) {
-      console.error('Error retrieving user debate sessions:', error);
-      res.status(500).json({
-         error: 'Internal Server Error',
-         message: 'Failed to retrieve user debate sessions'
+      const statusCode = error instanceof ApiError ? error.statusCode : 500;
+
+      logger.error('Error retrieving user debate sessions', {
+         error,
+         requestId: getRequestId(req),
+         path: req.path,
+         method: req.method,
+         userId: req.user?.id
+      });
+
+      return sendErrorResponse(res, error as Error, statusCode, {
+         requestId: getRequestId(req),
+         path: req.path,
+         method: req.method,
+         userId: req.user?.id
       });
    }
 };
 
 export const deleteDebateSession = async (req: Request, res: Response) => {
    try {
+      const requestId = getRequestId(req);
       const userData = req.user?.user || req.user;
       const { sessionId } = req.params;
 
       if (!userData || !userData.id) {
-         return res.status(401).json({
-            error: 'Unauthorized',
-            message: 'User not authenticated'
+         logger.warn('Unauthorized attempt to delete debate session', {
+            requestId,
+            sessionId,
+            path: req.path,
+            method: req.method
          });
+         throw new ApiError('User not authenticated', 401);
       }
+
+      logger.debug('Verifying debate session ownership before deletion', {
+         requestId,
+         userId: userData.id,
+         sessionId
+      });
 
       // Check if the debate session exists and belongs to the user
       const debateSession = await prisma.debateSession.findFirst({
@@ -274,11 +419,20 @@ export const deleteDebateSession = async (req: Request, res: Response) => {
       });
 
       if (!debateSession) {
-         return res.status(404).json({
-            error: 'Not Found',
-            message: 'Debate session not found or does not belong to the user'
+         logger.warn('Attempt to delete non-existent or unauthorized debate session', {
+            requestId,
+            userId: userData.id,
+            sessionId,
+            path: req.path
          });
+         throw new ApiError('Debate session not found or does not belong to the user', 404);
       }
+
+      logger.info('Deleting debate session and related data', {
+         requestId,
+         userId: userData.id,
+         sessionId
+      });
 
       // Delete all related messages first (due to foreign key constraints)
       await prisma.message.deleteMany({
@@ -308,30 +462,56 @@ export const deleteDebateSession = async (req: Request, res: Response) => {
          }
       });
 
-      res.status(200).json({
-         success: true,
-         message: 'Debate session deleted successfully'
+      logger.info('Debate session deleted successfully', {
+         requestId,
+         userId: userData.id,
+         sessionId
       });
+
+      return sendSuccessResponse(res, 200, null, 'Debate session deleted successfully');
    } catch (error) {
-      console.error('Error deleting debate session:', error);
-      res.status(500).json({
-         error: 'Internal Server Error',
-         message: 'Failed to delete debate session'
+      const statusCode = error instanceof ApiError ? error.statusCode : 500;
+
+      logger.error('Error deleting debate session', {
+         error,
+         requestId: getRequestId(req),
+         path: req.path,
+         method: req.method,
+         userId: req.user?.id,
+         sessionId: req.params.sessionId
+      });
+
+      return sendErrorResponse(res, error as Error, statusCode, {
+         requestId: getRequestId(req),
+         path: req.path,
+         method: req.method,
+         userId: req.user?.id,
+         sessionId: req.params.sessionId
       });
    }
 };
 
 export const saveDebateSession = async (req: Request, res: Response) => {
    try {
+      const requestId = getRequestId(req);
       const userData = req.user?.user || req.user;
       const { sessionId } = req.params;
 
       if (!userData || !userData.id) {
-         return res.status(401).json({
-            error: 'Unauthorized',
-            message: 'User not authenticated'
+         logger.warn('Unauthorized attempt to save debate session', {
+            requestId,
+            sessionId,
+            path: req.path,
+            method: req.method
          });
+         throw new ApiError('User not authenticated', 401);
       }
+
+      logger.debug('Verifying debate session existence', {
+         requestId,
+         userId: userData.id,
+         sessionId
+      });
 
       // Check if the debate session exists
       const debateSession = await prisma.debateSession.findUnique({
@@ -341,10 +521,13 @@ export const saveDebateSession = async (req: Request, res: Response) => {
       });
 
       if (!debateSession) {
-         return res.status(404).json({
-            error: 'Not Found',
-            message: 'Debate session not found'
+         logger.warn('Attempt to save non-existent debate session', {
+            requestId,
+            userId: userData.id,
+            sessionId,
+            path: req.path
          });
+         throw new ApiError('Debate session not found', 404);
       }
 
       // Check if this debate is already saved by the user
@@ -356,11 +539,20 @@ export const saveDebateSession = async (req: Request, res: Response) => {
       });
 
       if (existingSave) {
-         return res.status(400).json({
-            error: 'Bad Request',
-            message: 'Debate session is already saved'
+         logger.info('Attempt to save already saved debate session', {
+            requestId,
+            userId: userData.id,
+            sessionId,
+            savedId: existingSave.id
          });
+         throw new ApiError('Debate session is already saved', 400);
       }
+
+      logger.info('Saving debate session', {
+         requestId,
+         userId: userData.id,
+         sessionId
+      });
 
       // Save the debate session
       const savedDebate = await prisma.savedDebate.create({
@@ -370,29 +562,56 @@ export const saveDebateSession = async (req: Request, res: Response) => {
          }
       });
 
-      res.status(201).json({
-         success: true,
+      logger.info('Debate session saved successfully', {
+         requestId,
+         userId: userData.id,
+         sessionId,
+         savedId: savedDebate.id
+      });
+
+      return sendSuccessResponse(res, 201, {
          savedDebate
       });
    } catch (error) {
-      console.error('Error saving debate session:', error);
-      res.status(500).json({
-         error: 'Internal Server Error',
-         message: 'Failed to save debate session'
+      const statusCode = error instanceof ApiError ? error.statusCode : 500;
+
+      logger.error('Error saving debate session', {
+         error,
+         requestId: getRequestId(req),
+         path: req.path,
+         method: req.method,
+         userId: req.user?.id,
+         sessionId: req.params.sessionId
+      });
+
+      return sendErrorResponse(res, error as Error, statusCode, {
+         requestId: getRequestId(req),
+         path: req.path,
+         method: req.method,
+         userId: req.user?.id,
+         sessionId: req.params.sessionId
       });
    }
 };
 
 export const getSavedDebates = async (req: Request, res: Response) => {
    try {
+      const requestId = getRequestId(req);
       const userData = req.user?.user || req.user;
 
       if (!userData || !userData.id) {
-         return res.status(401).json({
-            error: 'Unauthorized',
-            message: 'User not authenticated'
+         logger.warn('Unauthorized attempt to access saved debates', {
+            requestId,
+            path: req.path,
+            method: req.method
          });
+         throw new ApiError('User not authenticated', 401);
       }
+
+      logger.debug('Retrieving saved debates', {
+         requestId,
+         userId: userData.id
+      });
 
       // Get all saved debates for the user with related debate session data
       const savedDebates = await prisma.savedDebate.findMany({
@@ -415,30 +634,56 @@ export const getSavedDebates = async (req: Request, res: Response) => {
          }
       });
 
-      res.status(200).json({
-         success: true,
+      logger.debug('Saved debates retrieved successfully', {
+         requestId,
+         userId: userData.id,
+         count: savedDebates.length
+      });
+
+      return sendSuccessResponse(res, 200, {
          savedDebates
       });
    } catch (error) {
-      console.error('Error retrieving saved debates:', error);
-      res.status(500).json({
-         error: 'Internal Server Error',
-         message: 'Failed to retrieve saved debates'
+      const statusCode = error instanceof ApiError ? error.statusCode : 500;
+
+      logger.error('Error retrieving saved debates', {
+         error,
+         requestId: getRequestId(req),
+         path: req.path,
+         method: req.method,
+         userId: req.user?.id
+      });
+
+      return sendErrorResponse(res, error as Error, statusCode, {
+         requestId: getRequestId(req),
+         path: req.path,
+         method: req.method,
+         userId: req.user?.id
       });
    }
 };
 
 export const removeSavedDebate = async (req: Request, res: Response) => {
    try {
+      const requestId = getRequestId(req);
       const userData = req.user?.user || req.user;
       const { savedId } = req.params;
 
       if (!userData || !userData.id) {
-         return res.status(401).json({
-            error: 'Unauthorized',
-            message: 'User not authenticated'
+         logger.warn('Unauthorized attempt to remove saved debate', {
+            requestId,
+            savedId,
+            path: req.path,
+            method: req.method
          });
+         throw new ApiError('User not authenticated', 401);
       }
+
+      logger.debug('Verifying saved debate ownership before removal', {
+         requestId,
+         userId: userData.id,
+         savedId
+      });
 
       // Check if the saved debate exists and belongs to the user
       const savedDebate = await prisma.savedDebate.findFirst({
@@ -449,11 +694,21 @@ export const removeSavedDebate = async (req: Request, res: Response) => {
       });
 
       if (!savedDebate) {
-         return res.status(404).json({
-            error: 'Not Found',
-            message: 'Saved debate not found or does not belong to the user'
+         logger.warn('Attempt to remove non-existent or unauthorized saved debate', {
+            requestId,
+            userId: userData.id,
+            savedId,
+            path: req.path
          });
+         throw new ApiError('Saved debate not found or does not belong to the user', 404);
       }
+
+      logger.info('Removing saved debate', {
+         requestId,
+         userId: userData.id,
+         savedId,
+         debateSessionId: savedDebate.debateSessionId
+      });
 
       // Delete the saved debate
       await prisma.savedDebate.delete({
@@ -462,15 +717,31 @@ export const removeSavedDebate = async (req: Request, res: Response) => {
          }
       });
 
-      res.status(200).json({
-         success: true,
-         message: 'Saved debate removed successfully'
+      logger.info('Saved debate removed successfully', {
+         requestId,
+         userId: userData.id,
+         savedId
       });
+
+      return sendSuccessResponse(res, 200, null, 'Saved debate removed successfully');
    } catch (error) {
-      console.error('Error removing saved debate:', error);
-      res.status(500).json({
-         error: 'Internal Server Error',
-         message: 'Failed to remove saved debate'
+      const statusCode = error instanceof ApiError ? error.statusCode : 500;
+
+      logger.error('Error removing saved debate', {
+         error,
+         requestId: getRequestId(req),
+         path: req.path,
+         method: req.method,
+         userId: req.user?.id,
+         savedId: req.params.savedId
+      });
+
+      return sendErrorResponse(res, error as Error, statusCode, {
+         requestId: getRequestId(req),
+         path: req.path,
+         method: req.method,
+         userId: req.user?.id,
+         savedId: req.params.savedId
       });
    }
 }; 

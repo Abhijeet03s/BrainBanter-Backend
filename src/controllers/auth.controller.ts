@@ -8,15 +8,17 @@ const prisma = new PrismaClient();
 
 export const handleUserAuth = async (req: Request, res: Response) => {
    try {
+      const requestId = getRequestId(req);
       // Extract the user data correctly from the nested structure
       const userData = req.user?.user || req.user;
 
       if (!userData || !userData.id || !userData.email) {
-         res.status(400).json({
-            error: 'Bad Request',
-            message: 'Invalid user data'
+         logger.warn('Invalid user data in authentication request', {
+            requestId,
+            path: req.path,
+            method: req.method
          });
-         return;
+         throw new ApiError('Invalid user data', 400);
       }
 
       // Check if user already exists in our database
@@ -26,6 +28,12 @@ export const handleUserAuth = async (req: Request, res: Response) => {
 
       if (!dbUser) {
          // Create new user in our database
+         logger.info('Creating new user in database', {
+            requestId,
+            userId: userData.id,
+            email: userData.email
+         });
+
          dbUser = await prisma.user.create({
             data: {
                id: userData.id,
@@ -34,33 +42,48 @@ export const handleUserAuth = async (req: Request, res: Response) => {
                authProvider: 'supabase'
             }
          });
+      } else {
+         logger.debug('User already exists in database', {
+            requestId,
+            userId: dbUser.id
+         });
       }
 
-      res.status(200).json({
-         message: 'User authenticated successfully',
+      return sendSuccessResponse(res, 200, {
          id: dbUser.id,
          email: dbUser.email,
          username: dbUser.username
-      });
+      }, 'User authenticated successfully');
    } catch (error) {
-      console.error('Error in handleUserAuth:', error);
-      res.status(500).json({
-         error: 'Internal Server Error',
-         message: 'Failed to process user authentication'
+      const statusCode = error instanceof ApiError ? error.statusCode : 500;
+
+      logger.error('Error in user authentication', {
+         error,
+         requestId: getRequestId(req),
+         path: req.path,
+         method: req.method
+      });
+
+      return sendErrorResponse(res, error as Error, statusCode, {
+         requestId: getRequestId(req),
+         path: req.path,
+         method: req.method
       });
    }
 };
 
 export const getCurrentUser = async (req: Request, res: Response) => {
    try {
+      const requestId = getRequestId(req);
       const userData = req.user?.user || req.user;
 
       if (!userData || !userData.id) {
-         res.status(401).json({
-            error: 'Unauthorized',
-            message: 'User not authenticated'
+         logger.warn('User not authenticated', {
+            requestId,
+            path: req.path,
+            method: req.method
          });
-         return;
+         throw new ApiError('User not authenticated', 401);
       }
 
       // Get user from our database
@@ -69,38 +92,49 @@ export const getCurrentUser = async (req: Request, res: Response) => {
       });
 
       if (!dbUser) {
-         res.status(404).json({
-            error: 'Not Found',
-            message: 'User not found in database'
+         logger.warn('User not found in database', {
+            requestId,
+            userId: userData.id,
+            path: req.path
          });
-         return;
+         throw new ApiError('User not found in database', 404);
       }
 
-      res.status(200).json({
+      logger.debug('User profile retrieved successfully', {
+         requestId,
+         userId: dbUser.id
+      });
+
+      return sendSuccessResponse(res, 200, {
          id: dbUser.id,
          email: dbUser.email,
          username: dbUser.username,
          preferences: dbUser.preferences
       });
    } catch (error) {
-      console.error('Error in getCurrentUser:', error);
-      res.status(500).json({
-         error: 'Internal Server Error',
-         message: 'Failed to retrieve user profile'
+      const statusCode = error instanceof ApiError ? error.statusCode : 500;
+
+      return sendErrorResponse(res, error as Error, statusCode, {
+         requestId: getRequestId(req),
+         path: req.path,
+         method: req.method,
+         userId: req.user?.id
       });
    }
 };
 
 export const forgotPassword = async (req: Request, res: Response) => {
    try {
+      const requestId = getRequestId(req);
       const { email } = req.body;
 
       if (!email) {
-         res.status(400).json({
-            error: 'Bad Request',
-            message: 'Email is required'
+         logger.warn('Missing email in password reset request', {
+            requestId,
+            path: req.path,
+            method: req.method
          });
-         return;
+         throw new ApiError('Email is required', 400);
       }
 
       // Check if user exists in our database
@@ -110,10 +144,14 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
       if (!user) {
          // Still return success to prevent email enumeration attacks
-         res.status(200).json({
-            message: 'If an account with that email exists, a password reset link has been sent'
+         logger.info('Password reset requested for non-existent email', {
+            requestId,
+            email: email,
+            exists: false
          });
-         return;
+
+         return sendSuccessResponse(res, 200, null,
+            'If an account with that email exists, a password reset link has been sent');
       }
 
       // Send password reset email via Supabase Auth
@@ -122,22 +160,30 @@ export const forgotPassword = async (req: Request, res: Response) => {
       });
 
       if (error) {
-         console.error('Error sending reset email:', error);
-         res.status(500).json({
-            error: 'Internal Server Error',
-            message: 'Failed to send password reset email'
+         logger.error('Error sending reset email', {
+            error,
+            requestId,
+            userId: user.id,
+            email: email
          });
-         return;
+         throw new ApiError('Failed to send password reset email', 500);
       }
 
-      res.status(200).json({
-         message: 'If an account with that email exists, a password reset link has been sent'
+      logger.info('Password reset email sent successfully', {
+         requestId,
+         userId: user.id,
+         email: email
       });
+
+      return sendSuccessResponse(res, 200, null,
+         'If an account with that email exists, a password reset link has been sent');
    } catch (error) {
-      console.error('Error in forgotPassword:', error);
-      res.status(500).json({
-         error: 'Internal Server Error',
-         message: 'Failed to process password reset request'
+      const statusCode = error instanceof ApiError ? error.statusCode : 500;
+
+      return sendErrorResponse(res, error as Error, statusCode, {
+         requestId: getRequestId(req),
+         path: req.path,
+         method: req.method
       });
    }
 };

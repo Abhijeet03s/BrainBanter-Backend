@@ -1,13 +1,14 @@
 import dotenv from 'dotenv';
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { getSystemPrompt, getSentimentAnalysisPrompt } from '../config/prompts';
+import { logger } from '../utils/logger';
 
 dotenv.config();
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 if (!GEMINI_API_KEY) {
-   console.error('GEMINI_API_KEY is not defined in environment variables');
+   logger.error('GEMINI_API_KEY is not defined in environment variables');
 }
 
 class AIService {
@@ -16,6 +17,7 @@ class AIService {
    constructor() {
       const genAI = new GoogleGenerativeAI(GEMINI_API_KEY || '');
       this.model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+      logger.info('AI service initialized with Gemini 1.5 Pro model');
    }
 
    private cleanFormattedResponse(response: string): string {
@@ -65,6 +67,12 @@ class AIService {
             maxOutputTokens: 800,
          };
 
+         logger.debug('Generating AI response', {
+            stance: options?.stance || 'neutral',
+            depth: options?.depth || 'deep',
+            historyLength: history.length
+         });
+
          // Format history for the chat model
          const formattedHistory = history.map(msg => ({
             role: msg.sender === 'user' ? 'user' : 'model',
@@ -96,9 +104,14 @@ class AIService {
          // Clean the response to remove any formatting
          response = this.cleanFormattedResponse(response);
 
+         logger.debug('AI response generated successfully', {
+            responseLength: response.length,
+            stance: options?.stance || 'neutral'
+         });
+
          return response;
       } catch (error) {
-         console.error('Error generating AI response:', error);
+         logger.error('Error generating AI response', { error });
          throw new Error('Failed to generate AI response');
       }
    }
@@ -112,6 +125,11 @@ class AIService {
          // Default settings
          let stance: 'supportive' | 'challenging' | 'neutral' = 'neutral';
          let depth: 'surface' | 'deep' | 'expert' = 'deep';
+
+         logger.debug('Analyzing user sentiment', {
+            messageLength: message.length,
+            historyLength: history.length
+         });
 
          // For complex topics or longer discussions, use the AI to analyze
          if (history.length >= 3) {
@@ -131,14 +149,17 @@ class AIService {
 
             const depthMatch = analysis.match(/depth:\s*(surface|deep|expert)/i);
             if (depthMatch) depth = depthMatch[1].toLowerCase() as any;
+
+            logger.debug('Sentiment analysis complete', { stance, depth });
          } else {
             // For early in the conversation, start with a challenging stance
             stance = 'challenging';
+            logger.debug('Using default challenging stance for early conversation');
          }
 
          return { stance, depth };
       } catch (error) {
-         console.error('Error analyzing sentiment:', error);
+         logger.error('Error analyzing sentiment', { error });
          return { stance: 'neutral', depth: 'deep' };
       }
    }
