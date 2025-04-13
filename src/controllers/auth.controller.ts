@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { supabaseAdmin } from '../config/supabase';
-import { logger } from '../utils/logger';
-import { sendSuccessResponse, sendErrorResponse, ApiError, getRequestId } from '../utils/api-utils';
+import { supabaseAdmin } from '@/config/supabase';
+import { logger } from '@/utils/logger';
+import { sendSuccessResponse, sendErrorResponse, ApiError, getRequestId } from '@/utils/api-utils';
 
 const prisma = new PrismaClient();
 

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { logger } from '../utils/logger';
-import { getRequestId } from '../utils/api-utils';
+import { logger } from '@/utils/logger';
+import { getRequestId } from '@/utils/api-utils';
 
 export interface ApiError extends Error {
    statusCode?: number;

@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { aiService } from '../services/ai.service';
-import { getInitialDebatePrompt } from '../config/prompts';
-import { logger } from '../utils/logger';
-import { sendSuccessResponse, sendErrorResponse, ApiError, getRequestId } from '../utils/api-utils';
+import { aiService } from '@/services/ai.service';
+import { getInitialDebatePrompt } from '@/config/prompts';
+import { logger } from '@/utils/logger';
+import { sendSuccessResponse, sendErrorResponse, ApiError, getRequestId } from '@/utils/api-utils';
 
 const prisma = new PrismaClient();
 

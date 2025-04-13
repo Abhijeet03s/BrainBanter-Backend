@@ -2,11 +2,11 @@ import express, { Application } from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import morgan from 'morgan';
-import authRoutes from './routes/auth.routes';
-import debateRoutes from './routes/debate.routes';
+import authRoutes from '@/routes/auth.routes';
+import debateRoutes from '@/routes/debate.routes';
 import dotenv from 'dotenv';
-import { logger, stream } from './utils/logger';
-import { notFound, errorHandler } from './middleware/error';
+import { logger, stream } from '@/utils/logger';
+import { notFound, errorHandler } from '@/middleware/error';
 
 dotenv.config();
 

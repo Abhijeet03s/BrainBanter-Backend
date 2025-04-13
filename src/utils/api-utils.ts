@@ -1,5 +1,5 @@
 import { Response, Request } from 'express';
-import { logger } from './logger';
+import { logger } from '@/utils/logger';
 
 interface SuccessResponse {
    success: boolean;
