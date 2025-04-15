@@ -7,6 +7,7 @@ import debateRoutes from '@/routes/debate.routes';
 import dotenv from 'dotenv';
 import { logger, stream } from '@/utils/logger';
 import { notFound, errorHandler } from '@/middleware/error';
+import { applyRateLimiting } from '@/middleware/rateLimiter';
 
 dotenv.config();
 
@@ -20,6 +21,9 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // Request logging
 app.use(morgan('combined', { stream }));
+
+// Apply rate limiting middleware
+app.use(applyRateLimiting);
 
 // Routes
 app.use('/api/auth', authRoutes);
