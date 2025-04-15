@@ -140,17 +140,23 @@ export const sendMessage = async (req: Request, res: Response) => {
          throw new ApiError('User not authenticated', 401);
       }
 
-      if (!sessionId || !message) {
-         logger.warn('Missing session ID or message in request', {
+      if (!message) {
+         logger.warn('Missing message content', {
             requestId,
             userId: userData.id,
             sessionId,
             path: req.path
          });
-         throw new ApiError('Session ID and message are required', 400);
+         throw new ApiError('Message content is required', 400);
       }
 
-      // Check if the debate session exists and belongs to the user
+      // Check if session exists and belongs to user
+      logger.debug('Verifying debate session ownership', {
+         requestId,
+         userId: userData.id,
+         sessionId
+      });
+
       const debateSession = await prisma.debateSession.findFirst({
          where: {
             id: sessionId,
@@ -168,22 +174,6 @@ export const sendMessage = async (req: Request, res: Response) => {
          throw new ApiError('Debate session not found or does not belong to the user', 404);
       }
 
-      logger.debug('Processing message for debate session', {
-         requestId,
-         userId: userData.id,
-         sessionId
-      });
-
-      // Get the conversation history
-      const history = await prisma.message.findMany({
-         where: {
-            debateSessionId: sessionId
-         },
-         orderBy: {
-            createdAt: 'asc'
-         }
-      });
-
       // Save the user's message
       const userMessage = await prisma.message.create({
          data: {
@@ -193,8 +183,40 @@ export const sendMessage = async (req: Request, res: Response) => {
          }
       });
 
+      logger.debug('User message saved', {
+         requestId,
+         userId: userData.id,
+         sessionId,
+         messageId: userMessage.id
+      });
+
+      // Get message history
+      const history = await prisma.message.findMany({
+         where: {
+            debateSessionId: sessionId
+         },
+         orderBy: {
+            createdAt: 'asc'
+         }
+      });
+
+      logger.debug('Retrieved message history', {
+         requestId,
+         userId: userData.id,
+         sessionId,
+         historyLength: history.length
+      });
+
+      // Create message history format for AI service
+      const messageHistory = history.map(msg => ({
+         sender: msg.sender,
+         content: msg.content
+      }));
+
       // Analyze sentiment and determine appropriate stance
-      const analysisResult = await aiService.analyzeUserSentiment(message, history);
+      const startTime = Date.now();
+
+      const analysisResult = await aiService.analyzeUserSentiment(message, messageHistory);
 
       logger.debug('AI sentiment analysis completed', {
          requestId,
@@ -206,9 +228,11 @@ export const sendMessage = async (req: Request, res: Response) => {
       // Generate AI response based on conversation history and analysis
       const aiResponse = await aiService.generateDebateResponse(
          message,
-         history,
+         messageHistory,
          analysisResult
       );
+
+      const responseTime = Date.now() - startTime;
 
       // Save the AI's response
       const aiMessage = await prisma.message.create({
@@ -219,11 +243,18 @@ export const sendMessage = async (req: Request, res: Response) => {
          }
       });
 
+      // Update the session's last activity time
+      await prisma.debateSession.update({
+         where: { id: sessionId },
+         data: { updatedAt: new Date() }
+      });
+
       logger.info('Message processed successfully', {
          requestId,
          userId: userData.id,
          sessionId,
-         messageId: aiMessage.id
+         messageId: aiMessage.id,
+         responseTimeMs: responseTime
       });
 
       return sendSuccessResponse(res, 200, {

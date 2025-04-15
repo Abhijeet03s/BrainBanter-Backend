@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { getSystemPrompt, getSentimentAnalysisPrompt } from '@/config/prompts';
 import { logger } from '@/utils/logger';
+import { cacheService } from '@/services/cache.service';
 
 dotenv.config();
 
@@ -16,8 +17,28 @@ class AIService {
 
    constructor() {
       const genAI = new GoogleGenerativeAI(GEMINI_API_KEY || '');
-      this.model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
-      logger.info('AI service initialized with Gemini 1.5 Pro model');
+      this.model = genAI.getGenerativeModel({ model: 'gemini-2.0-pro' });
+      logger.info('AI service initialized with Gemini 2.0 Pro model');
+   }
+
+   // Helper to create cache key for AI responses
+   private createCacheKey(prompt: string, history: any[], options?: any): string {
+      return cacheService.createKey(
+         'ai_response',
+         prompt,
+         history.length > 0 ? history.map(msg => `${msg.sender}:${msg.content.substring(0, 100)}`).join('|') : 'no_history',
+         options?.stance || 'neutral',
+         options?.depth || 'deep'
+      );
+   }
+
+   // Helper to create cache key for sentiment analysis
+   private createSentimentCacheKey(message: string, history: any[]): string {
+      return cacheService.createKey(
+         'sentiment',
+         message,
+         history.length > 0 ? history.slice(-3).map(msg => `${msg.sender}:${msg.content.substring(0, 100)}`).join('|') : 'no_history'
+      );
    }
 
    private cleanFormattedResponse(response: string): string {
@@ -59,6 +80,20 @@ class AIService {
       depth?: 'surface' | 'deep' | 'expert'
    }): Promise<string> {
       try {
+         // Create a cache key for this specific request
+         const cacheKey = this.createCacheKey(prompt, history, options);
+
+         // Check if we have a cached response
+         const cachedResponse = cacheService.get<string>(cacheKey);
+         if (cachedResponse) {
+            logger.info('Using cached AI response', {
+               promptLength: prompt.length,
+               historyLength: history.length,
+               stance: options?.stance || 'neutral'
+            });
+            return cachedResponse;
+         }
+
          // Configure the model parameters for debate-style responses
          const generationConfig = {
             temperature: options?.stance === 'challenging' ? 0.8 : 0.7,
@@ -104,6 +139,9 @@ class AIService {
          // Clean the response to remove any formatting
          response = this.cleanFormattedResponse(response);
 
+         // Cache the response for future use (1 hour TTL)
+         cacheService.set(cacheKey, response, 3600);
+
          logger.debug('AI response generated successfully', {
             responseLength: response.length,
             stance: options?.stance || 'neutral'
@@ -131,33 +169,49 @@ class AIService {
             historyLength: history.length
          });
 
-         // For complex topics or longer discussions, use the AI to analyze
-         if (history.length >= 3) {
-            // Get the sentiment analysis prompt from the prompts configuration
-            const analysisPrompt = getSentimentAnalysisPrompt(history, message);
-
-            const chat = this.model.startChat({
-               generationConfig: { temperature: 0.1, maxOutputTokens: 100 },
-            });
-
-            const result = await chat.sendMessage(analysisPrompt);
-            const analysis = result.response.text();
-
-            // Parse results
-            const stanceMatch = analysis.match(/stance:\s*(supportive|challenging|neutral)/i);
-            if (stanceMatch) stance = stanceMatch[1].toLowerCase() as any;
-
-            const depthMatch = analysis.match(/depth:\s*(surface|deep|expert)/i);
-            if (depthMatch) depth = depthMatch[1].toLowerCase() as any;
-
-            logger.debug('Sentiment analysis complete', { stance, depth });
-         } else {
-            // For early in the conversation, start with a challenging stance
+         // For very early conversations, use default challenging stance
+         if (history.length < 3) {
             stance = 'challenging';
             logger.debug('Using default challenging stance for early conversation');
+            return { stance, depth };
          }
 
-         return { stance, depth };
+         // Create cache key for sentiment analysis
+         const cacheKey = this.createSentimentCacheKey(message, history);
+
+         // Check if we have cached sentiment analysis
+         const cachedAnalysis = cacheService.get<{ stance: any, depth: any }>(cacheKey);
+         if (cachedAnalysis) {
+            logger.info('Using cached sentiment analysis', {
+               stance: cachedAnalysis.stance,
+               depth: cachedAnalysis.depth
+            });
+            return cachedAnalysis;
+         }
+
+         // Get the sentiment analysis prompt from the prompts configuration
+         const analysisPrompt = getSentimentAnalysisPrompt(history, message);
+
+         const chat = this.model.startChat({
+            generationConfig: { temperature: 0.1, maxOutputTokens: 100 },
+         });
+
+         const result = await chat.sendMessage(analysisPrompt);
+         const analysis = result.response.text();
+
+         // Parse results
+         const stanceMatch = analysis.match(/stance:\s*(supportive|challenging|neutral)/i);
+         if (stanceMatch) stance = stanceMatch[1].toLowerCase() as any;
+
+         const depthMatch = analysis.match(/depth:\s*(surface|deep|expert)/i);
+         if (depthMatch) depth = depthMatch[1].toLowerCase() as any;
+
+         // Cache the result for 30 minutes
+         const analysisResult = { stance, depth };
+         cacheService.set(cacheKey, analysisResult, 1800);
+
+         logger.debug('Sentiment analysis complete', { stance, depth });
+         return analysisResult;
       } catch (error) {
          logger.error('Error analyzing sentiment', { error });
          return { stance: 'neutral', depth: 'deep' };
@@ -165,4 +219,5 @@ class AIService {
    }
 }
 
+// Export singleton instance
 export const aiService = new AIService(); 
