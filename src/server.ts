@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 import { logger, stream } from '@/utils/logger';
 import { notFound, errorHandler } from '@/middleware/error';
 import { applyRateLimiting } from '@/middleware/rateLimiter';
+import { setupSwagger } from '@/middleware/swagger';
 
 dotenv.config();
 
@@ -25,16 +26,55 @@ app.use(morgan('combined', { stream }));
 // Apply rate limiting middleware
 app.use(applyRateLimiting);
 
+// Set up Swagger documentation
+setupSwagger(app);
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/debates', debateRoutes);
 
-// Health check route
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     summary: Health check endpoint
+ *     description: Check if the server is running
+ *     tags: [System]
+ *     responses:
+ *       200:
+ *         description: Server is running
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: ok
+ *                 message:
+ *                   type: string
+ *                   example: Server is running
+ */
 app.get('/health', (req, res) => {
    res.status(200).json({ status: 'ok', message: 'Server is running' });
 });
 
-// Simple test route
+/**
+ * @swagger
+ * /:
+ *   get:
+ *     summary: Root endpoint
+ *     description: Returns a simple message indicating the server is running
+ *     tags: [System]
+ *     responses:
+ *       200:
+ *         description: A welcome message
+ *         content:
+ *           text/plain:
+ *             schema:
+ *               type: string
+ *               example: BrainBanter backend is running
+ */
 app.get('/', (req, res) => {
    res.send('BrainBanter backend is running');
 });

@@ -10,6 +10,7 @@ BrainBanter is a backend service designed to support a debate platform. It lever
 - [Setup Instructions](#setup-instructions)
 - [Usage](#usage)
 - [API Endpoints](#api-endpoints)
+- [API Documentation](#api-documentation)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -76,4 +77,29 @@ BrainBanter is a backend service that facilitates user authentication, debate se
 - **GET /health**: Check server health status.
 - **POST /api/auth/callback**: Handle user authentication after Supabase login.
 - **GET /api/auth/me**: Retrieve current user profile.
+
+## API Documentation
+
+The API is documented using Swagger/OpenAPI. You can access the interactive documentation at:
+
+```
+http://localhost:8080/api-docs
+```
+
+The documentation provides:
+
+- Detailed information about all available endpoints
+- Request and response schemas
+- Authentication requirements
+- Interactive testing capabilities
+
+You can also access the raw OpenAPI specification at:
+
+```
+http://localhost:8080/api-docs.json
+```
+
+## License
+
+This project is licensed under the ISC License.
 
