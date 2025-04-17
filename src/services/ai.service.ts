@@ -17,8 +17,8 @@ class AIService {
 
    constructor() {
       const genAI = new GoogleGenerativeAI(GEMINI_API_KEY || '');
-      this.model = genAI.getGenerativeModel({ model: 'gemini-2.0-pro' });
-      logger.info('AI service initialized with Gemini 2.0 Pro model');
+      this.model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      logger.info('AI service initialized with Gemini 2.0 Flash model');
    }
 
    // Helper to create cache key for AI responses
