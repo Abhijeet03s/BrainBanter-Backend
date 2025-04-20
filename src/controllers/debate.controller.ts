@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { aiService } from '@/services/ai.service';
 import { getInitialDebatePrompt } from '@/config/prompts';
+import { clearCache } from '@/middleware/cache';
+import { CACHE_KEYS } from '@/config/redis';
 
 const prisma = new PrismaClient();
 
@@ -77,6 +79,9 @@ export const startDebateSession = async (req: Request, res: Response) => {
          session: debateSession,
          messages: [userMessage, aiMessage]
       });
+
+      // Invalidate user's debate sessions cache
+      await clearCache(`${CACHE_KEYS.DEBATE_SESSION}user:${userData.id}`);
    } catch (error) {
       console.error('Error starting debate session:', error);
       res.status(500).json({
@@ -308,6 +313,13 @@ export const deleteDebateSession = async (req: Request, res: Response) => {
          }
       });
 
+      // Invalidate related caches
+      await Promise.all([
+         clearCache(`${CACHE_KEYS.DEBATE_SESSION}${sessionId}`),
+         clearCache(`${CACHE_KEYS.DEBATE_SESSION}user:${userData.id}`),
+         clearCache(`${CACHE_KEYS.SAVED_DEBATES}${userData.id}`)
+      ]);
+
       res.status(200).json({
          success: true,
          message: 'Debate session deleted successfully'
@@ -374,6 +386,9 @@ export const saveDebateSession = async (req: Request, res: Response) => {
          success: true,
          savedDebate
       });
+
+      // Invalidate saved debates cache
+      await clearCache(`${CACHE_KEYS.SAVED_DEBATES}${userData.id}`);
    } catch (error) {
       console.error('Error saving debate session:', error);
       res.status(500).json({

@@ -10,6 +10,8 @@ import {
    removeSavedDebate
 } from '@/controllers/debate.controller';
 import { authenticateUser } from '@/middleware/auth';
+import { cacheMiddleware } from '@/middleware/cache';
+import { CACHE_TTL, CACHE_KEYS } from '@/config/redis';
 
 const router = Router();
 
@@ -181,7 +183,10 @@ router.post('/sessions/:sessionId/messages', sendMessage);
  *       404:
  *         description: Debate session not found
  */
-router.get('/sessions/:sessionId', getDebateSession);
+router.get('/sessions/:sessionId', cacheMiddleware({
+   ttl: CACHE_TTL.DEBATE_SESSION,
+   key: (req) => `${CACHE_KEYS.DEBATE_SESSION}${req.params.sessionId}`
+}), getDebateSession);
 
 /**
  * @swagger
@@ -211,7 +216,10 @@ router.get('/sessions/:sessionId', getDebateSession);
  *       401:
  *         description: Unauthorized
  */
-router.get('/sessions', getUserDebateSessions);
+router.get('/sessions', cacheMiddleware({
+   ttl: CACHE_TTL.DEBATE_SESSION,
+   key: (req) => `${CACHE_KEYS.DEBATE_SESSION}user:${req.user.id}`
+}), getUserDebateSessions);
 
 /**
  * @swagger
@@ -305,7 +313,10 @@ router.post('/sessions/:sessionId/save', saveDebateSession);
  *       401:
  *         description: Unauthorized
  */
-router.get('/saved', getSavedDebates);
+router.get('/saved', cacheMiddleware({
+   ttl: CACHE_TTL.SAVED_DEBATES,
+   key: (req) => `${CACHE_KEYS.SAVED_DEBATES}${req.user.id}`
+}), getSavedDebates);
 
 /**
  * @swagger
