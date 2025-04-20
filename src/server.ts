@@ -6,6 +6,7 @@ import authRoutes from "@/routes/auth.routes"
 import dotenv from 'dotenv';
 import debateRoutes from "@/routes/debate.routes"
 import { setupSwagger } from "@/middleware/swagger"
+import { apiLimiter, authLimiter, healthLimiter } from "@/middleware/rateLimiter"
 
 dotenv.config();
 
@@ -17,6 +18,10 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// Rate limiting to all routes
+app.use('/api/', apiLimiter);
+app.use('/api/auth', authLimiter);
+app.use('/health', healthLimiter);
 
 // Set up Swagger documentation
 setupSwagger(app);
