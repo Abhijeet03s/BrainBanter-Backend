@@ -1,7 +1,6 @@
 import { Application, Request, Response } from 'express';
 import swaggerUi from 'swagger-ui-express';
-import { specs } from '@/config/swagger';
-import { logger } from '@/utils/logger';
+import { specs } from '../config/swagger';
 
 export const setupSwagger = (app: Application): void => {
    // Serve Swagger documentation
@@ -17,6 +16,4 @@ export const setupSwagger = (app: Application): void => {
       res.setHeader('Content-Type', 'application/json');
       res.send(specs);
    });
-
-   logger.info('Swagger documentation initialized at /api-docs');
 }; 
