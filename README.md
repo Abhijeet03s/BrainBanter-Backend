@@ -83,7 +83,7 @@ BrainBanter is a backend service that facilitates user authentication, debate se
 The API is documented using Swagger/OpenAPI. You can access the interactive documentation at:
 
 ```
-http://localhost:8080/api-docs
+http://localhost:8000/api-docs
 ```
 
 The documentation provides:
@@ -96,7 +96,7 @@ The documentation provides:
 You can also access the raw OpenAPI specification at:
 
 ```
-http://localhost:8080/api-docs.json
+http://localhost:8000/api-docs.json
 ```
 
 ## License

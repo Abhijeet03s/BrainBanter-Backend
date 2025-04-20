@@ -17,7 +17,7 @@ const options: swaggerJsdoc.Options = {
          {
             url: process.env.NODE_ENV === 'production'
                ? 'https://api.brainbanter.io'
-               : 'http://localhost:8080',
+               : 'http://localhost:8000',
             description: process.env.NODE_ENV === 'production' ? 'Production server' : 'Development server',
          },
       ],

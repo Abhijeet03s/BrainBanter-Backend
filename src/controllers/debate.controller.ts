@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { aiService } from '../services/ai.service';
-import { getInitialDebatePrompt } from '../config/prompts';
+import { aiService } from '@/services/ai.service';
+import { getInitialDebatePrompt } from '@/config/prompts';
 
 const prisma = new PrismaClient();
 

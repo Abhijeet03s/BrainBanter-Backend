@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { supabaseAdmin } from '../config/supabase';
+import { supabaseAdmin } from '@/config/supabase';
 
 const prisma = new PrismaClient();
 

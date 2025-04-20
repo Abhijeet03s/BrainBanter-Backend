@@ -8,8 +8,8 @@ import {
    saveDebateSession,
    getSavedDebates,
    removeSavedDebate
-} from '../controllers/debate.controller';
-import { authenticateUser } from '../middleware/auth';
+} from '@/controllers/debate.controller';
+import { authenticateUser } from '@/middleware/auth';
 
 const router = Router();
 

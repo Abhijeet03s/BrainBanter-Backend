@@ -1,10 +1,11 @@
+import './paths';
 import express, { Application } from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
-import authRoutes from './routes/auth.routes';
+import authRoutes from "@/routes/auth.routes"
 import dotenv from 'dotenv';
-import debateRoutes from './routes/debate.routes';
-import { setupSwagger } from './middleware/swagger';
+import debateRoutes from "@/routes/debate.routes"
+import { setupSwagger } from "@/middleware/swagger"
 
 dotenv.config();
 

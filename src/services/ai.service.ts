@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
-import { getSystemPrompt, getSentimentAnalysisPrompt } from '../config/prompts';
+import { getSystemPrompt, getSentimentAnalysisPrompt } from '@/config/prompts';
 
 dotenv.config();
 
