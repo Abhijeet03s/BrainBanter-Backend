@@ -8,6 +8,7 @@ BrainBanter is a backend service designed to support a debate platform. It lever
 - [Features](#features)
 - [Technologies Used](#technologies-used)
 - [Setup Instructions](#setup-instructions)
+- [Docker Setup](#docker-setup)
 - [Usage](#usage)
 - [API Endpoints](#api-endpoints)
 - [API Documentation](#api-documentation)
@@ -66,6 +67,34 @@ BrainBanter is a backend service that facilitates user authentication, debate se
    ```bash
    npm run dev
    ```
+
+## Docker Setup
+
+### Running with Docker
+
+1. **Build the Docker image:**
+   ```bash
+   docker build -t brainbanter-backend .
+   ```
+
+2. **Run the container:**
+   ```bash
+   docker run -p 8000:8000 -d brainbanter-backend
+   ```
+
+### Running with Docker Compose (Production)
+
+Use the production Docker Compose file to run the full stack including PostgreSQL proxy, Redis, and PgBouncer:
+
+```bash
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+This will start all services defined in the production configuration, including:
+- Cloud SQL Proxy for database connection
+- Redis for caching
+- PgBouncer for connection pooling
+- The BrainBanter backend application
 
 ## Usage
 
