@@ -6,7 +6,7 @@ services:
     image: gcr.io/cloudsql-docker/gce-proxy:latest
     command:
       - "/cloud_sql_proxy"
-      - "--credentials-file=/secrets/brainbanter-sql-key.json"
+      - "--credential_file=/secrets/brainbanter-sql-key.json"
       - "--instances=gen-lang-client-0138247388:asia-south1:brainbanter-db=tcp:0.0.0.0:5432"
     volumes:
       - ./brainbanter-sql-key.json:/secrets/brainbanter-sql-key.json:ro
@@ -15,6 +15,17 @@ services:
       - backend-network
     ports:
       - "127.0.0.1:5432:5432" # Only expose to localhost
+
+  # Redis service
+  redis:
+    image: redis:alpine
+    restart: always
+    networks:
+      - backend-network
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
 
   # PgBouncer connection pooler
   pgbouncer:
@@ -37,18 +48,19 @@ services:
 
   # Main application
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: abhijet12/brainbanter-backend:latest
     depends_on:
       - pgbouncer
+      - redis
     environment:
       - NODE_ENV=production
       - PORT=8000
       - DATABASE_URL=postgresql://postgres:${DB_PASSWORD}@pgbouncer:6432/brainbanter?schema=public
+      - REDIS_URL=redis://redis:6379
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     ports:
       - "8000:8000"
     restart: always
@@ -63,3 +75,6 @@ services:
 networks:
   backend-network:
     driver: bridge
+
+volumes:
+  redis-data:

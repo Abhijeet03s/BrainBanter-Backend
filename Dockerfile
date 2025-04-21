@@ -34,14 +34,11 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/package*.json ./
 
 # Copy the service account key
-COPY brainbanter-sql-key.json /brainbanter-sql-key.json
+COPY brainbanter-sql-key.json ./brainbanter-sql-key.json
 
 # Expose the port
 ENV PORT=8000
 EXPOSE 8000
 
-# Start script that runs both the proxy and the application
-COPY deploy.sh /deploy.sh
-RUN chmod +x /deploy.sh
-
-CMD ["/deploy.sh"] 
+# Generate Prisma client and start the application
+CMD ["sh", "-c", "npx prisma generate && node build/server.js"] 

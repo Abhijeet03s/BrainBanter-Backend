@@ -13,5 +13,7 @@ logs
 *.log
 npm-debug.log*
 
-brainbanter-sql-key.json
-deploy.sh
+# Sensitive files
+*-sql-key.json
+*.pem
+*.key

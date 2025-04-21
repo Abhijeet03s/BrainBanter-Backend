@@ -3,15 +3,23 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const redisClient = new Redis({
-   host: process.env.REDIS_HOST || 'localhost',
-   port: parseInt(process.env.REDIS_PORT || '6379'),
-   password: process.env.REDIS_PASSWORD,
-   retryStrategy: (times: number): number => {
-      const delay = Math.min(times * 50, 2000);
-      return delay;
-   }
-});
+let redisClient: Redis;
+
+if (process.env.REDIS_URL) {
+   // Use the full Redis URL if provided
+   redisClient = new Redis(process.env.REDIS_URL);
+} else {
+   // Fall back to individual connection parameters
+   redisClient = new Redis({
+      host: process.env.REDIS_HOST || 'localhost',
+      port: parseInt(process.env.REDIS_PORT || '6379'),
+      password: process.env.REDIS_PASSWORD,
+      retryStrategy: (times: number): number => {
+         const delay = Math.min(times * 50, 2000);
+         return delay;
+      }
+   });
+}
 
 redisClient.on('error', (err: Error) => {
    console.error('Redis Client Error:', err);
