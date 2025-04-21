@@ -12,3 +12,6 @@ plan.md
 logs
 *.log
 npm-debug.log*
+
+brainbanter-sql-key.json
+deploy.sh
