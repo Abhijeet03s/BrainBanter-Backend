@@ -1,21 +1,6 @@
 version: "3.8"
 
 services:
-  # Cloud SQL Proxy service
-  cloudsql-proxy:
-    image: gcr.io/cloudsql-docker/gce-proxy:latest
-    command:
-      - "/cloud_sql_proxy"
-      - "--credential_file=/secrets/brainbanter-sql-key.json"
-      - "--instances=gen-lang-client-0138247388:asia-south1:brainbanter-db=tcp:0.0.0.0:5432"
-    volumes:
-      - ./brainbanter-sql-key.json:/secrets/brainbanter-sql-key.json:ro
-    restart: always
-    networks:
-      - backend-network
-    ports:
-      - "127.0.0.1:5432:5432" # Only expose to localhost
-
   # Redis service
   redis:
     image: redis:alpine
@@ -27,35 +12,15 @@ services:
     volumes:
       - redis-data:/data
 
-  # PgBouncer connection pooler
-  pgbouncer:
-    image: bitnami/pgbouncer:latest
-    depends_on:
-      - cloudsql-proxy
-    environment:
-      - POSTGRESQL_HOST=cloudsql-proxy
-      - POSTGRESQL_PORT=5432
-      - POSTGRESQL_USERNAME=postgres
-      - POSTGRESQL_PASSWORD=${DB_PASSWORD}
-      - POSTGRESQL_DATABASE=brainbanter
-      - PGBOUNCER_PORT=6432
-      - PGBOUNCER_MAX_CLIENT_CONN=200
-      - PGBOUNCER_POOL_MODE=transaction
-      - PGBOUNCER_DEFAULT_POOL_SIZE=25
-    networks:
-      - backend-network
-    restart: always
-
   # Main application
   app:
     image: abhijet12/brainbanter-backend:latest
     depends_on:
-      - pgbouncer
       - redis
     environment:
       - NODE_ENV=production
       - PORT=8000
-      - DATABASE_URL=postgresql://postgres:${DB_PASSWORD}@pgbouncer:6432/brainbanter?schema=public
+      - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=redis://redis:6379
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
