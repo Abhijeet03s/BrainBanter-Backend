@@ -9,6 +9,9 @@ export const handleUserAuth = async (req: Request, res: Response) => {
       // Extract the user data correctly from the nested structure
       const userData = req.user?.user || req.user;
 
+      // Debug logging to see what userData contains
+      console.log('userData received:', JSON.stringify(userData, null, 2));
+
       if (!userData || !userData.id || !userData.email) {
          res.status(400).json({
             error: 'Bad Request',
@@ -28,7 +31,7 @@ export const handleUserAuth = async (req: Request, res: Response) => {
             data: {
                id: userData.id,
                email: userData.email,
-               username: userData.username || userData.email.split('@')[0],
+               username: userData.user_metadata?.username || userData.email.split('@')[0],
                authProvider: 'supabase'
             }
          });

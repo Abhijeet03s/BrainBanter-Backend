@@ -13,6 +13,9 @@ dotenv.config();
 const app: Application = express();
 const PORT: number = parseInt(process.env.PORT || '8000');
 
+// Trust proxy when deployed behind a reverse proxy (like Render, Heroku, etc.)
+app.set('trust proxy', true);
+
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
