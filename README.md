@@ -1,134 +1,120 @@
 # BrainBanter Backend
 
-BrainBanter is a backend service designed to support a debate platform. It leverages Express.js for server-side operations, Prisma for database management, and Supabase for authentication.
+AI-powered debate platform that transforms user queries into engaging conversations with alternative perspectives and critical thinking challenges.
 
-## Table of Contents
+## Tech Stack
 
-- [Project Description](#project-description)
-- [Features](#features)
-- [Technologies Used](#technologies-used)
-- [Setup Instructions](#setup-instructions)
-- [Docker Setup](#docker-setup)
-- [Usage](#usage)
-- [API Endpoints](#api-endpoints)
-- [API Documentation](#api-documentation)
-- [Contributing](#contributing)
-- [License](#license)
+- **Runtime**: Node.js + Express + TypeScript
+- **Database**: PostgreSQL with Prisma ORM
+- **Authentication**: Supabase Auth
+- **AI**: Google Gemini API
+- **Cache**: Redis (ioredis)
+- **Documentation**: Swagger UI
 
-## Project Description
+## Quick Start
 
-BrainBanter is a backend service that facilitates user authentication, debate session management, and user feedback collection. It is built with scalability and security in mind, using modern web technologies.
+### Prerequisites
+- Node.js 18+
+- PostgreSQL database
+- Redis instance
 
-## Features
-
-- User authentication via Supabase
-- Debate session management
-- User feedback and reporting
-- Health check endpoint for server status
-
-## Technologies Used
-
-- **Node.js**: JavaScript runtime
-- **Express.js**: Web framework for Node.js
-- **Prisma**: ORM for database management
-- **Supabase**: Authentication and database service
-- **TypeScript**: Typed superset of JavaScript
-- **PostgreSQL**: Database
-
-## Setup Instructions
-
-1. **Clone the repository:**
-
-   ```bash
-   git clone https://github.com/yourusername/brainbanter-backend.git
-   cd brainbanter-backend
-   ```
-
-2. **Install dependencies:**
-
-   ```bash
-   npm install
-   ```
-
-3. **Set up environment variables:**
-
-   Create a `.env` file in the root directory and add the following:
-
-   ```plaintext
-   PORT=8000
-   SUPABASE_URL=your_supabase_url
-   SUPABASE_KEY=your_supabase_key
-   SUPABASE_SERVICE_KEY=your_supabase_service_key
-   DATABASE_URL=your_database_url
-   ```
-
-4. **Run the development server:**
-
-   ```bash
-   npm run dev
-   ```
-
-## Docker Setup
-
-### Running with Docker
-
-1. **Build the Docker image:**
-   ```bash
-   docker build -t brainbanter-backend .
-   ```
-
-2. **Run the container:**
-   ```bash
-   docker run -p 8000:8000 -d brainbanter-backend
-   ```
-
-### Running with Docker Compose (Production)
-
-Use the production Docker Compose file to run the full stack including PostgreSQL proxy, Redis, and PgBouncer:
+### Installation
 
 ```bash
-docker-compose -f docker-compose.prod.yml up -d
+# Clone and install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env
+
+# Generate Prisma client and run migrations
+npx prisma generate
+npx prisma migrate dev
+
+# Start development server
+npm run dev
 ```
 
-This will start all services defined in the production configuration, including:
-- Cloud SQL Proxy for database connection
-- Redis for caching
-- PgBouncer for connection pooling
-- The BrainBanter backend application
+### Environment Variables
 
-## Usage
-
-- Access the server at `http://localhost:8000`.
-- Use the `/api/auth` endpoint for authentication-related operations.
+```env
+DATABASE_URL="postgresql://..."
+SUPABASE_URL="https://..."
+SUPABASE_ANON_KEY="..."
+GOOGLE_AI_API_KEY="..."
+REDIS_URL="redis://..."
+PORT=8000
+```
 
 ## API Endpoints
 
-- **GET /health**: Check server health status.
-- **POST /api/auth/callback**: Handle user authentication after Supabase login.
-- **GET /api/auth/me**: Retrieve current user profile.
+### Authentication
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/login` - User login
+- `GET /api/auth/profile` - Get user profile
 
-## API Documentation
+### Debates
+- `POST /api/debates` - Create debate session
+- `GET /api/debates` - List user debates
+- `GET /api/debates/:id` - Get debate details
+- `POST /api/debates/:id/messages` - Send message
+- `POST /api/debates/:id/save` - Save debate
 
-The API is documented using Swagger/OpenAPI. You can access the interactive documentation at:
+### System
+- `GET /health` - Health check
+- `GET /api-docs` - Swagger documentation
+
+## Database Schema
+
+### Core Models
+- **User**: Authentication and preferences
+- **DebateSession**: Conversation containers
+- **Message**: Individual chat messages
+- **Feedback**: User ratings and comments
+- **ConversationAnalytics**: Session metrics
+
+## Development
+
+```bash
+# Development with hot reload
+npm run dev
+
+# Build for production
+npm run build
+
+# Start production server
+npm start
+```
+
+## Docker Deployment
+
+```bash
+# Build and run with Docker Compose
+docker-compose up --build
+
+# Or build standalone
+docker build -t brainbanter-backend .
+docker run -p 8000:8000 brainbanter-backend
+```
+
+## Features
+
+- **AI Debate Engine**: Google Gemini-powered conversations
+- **Rate Limiting**: API protection with configurable limits
+- **Real-time Analytics**: Conversation tracking and metrics
+- **Secure Authentication**: Supabase-based user management
+- **Swagger Documentation**: Interactive API explorer
+- **Docker Ready**: Multi-stage build for production
+
+## Project Structure
 
 ```
-http://localhost:8000/api-docs
+src/
+├── controllers/    # Request handlers
+├── routes/        # API route definitions
+├── services/      # Business logic & AI integration
+├── middleware/    # Auth, rate limiting, validation
+├── config/        # Database and app configuration
+└── server.ts      # Application entry point
 ```
-
-The documentation provides:
-
-- Detailed information about all available endpoints
-- Request and response schemas
-- Authentication requirements
-- Interactive testing capabilities
-
-You can also access the raw OpenAPI specification at:
-
-```
-http://localhost:8000/api-docs.json
-```
-
-## License
-
-This project is licensed under the ISC License.
 
